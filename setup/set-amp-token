@@ -1,0 +1,26 @@
+#!/bin/bash
+# Saves the Amp provider token, starts the provider and reports whether Amp accepted it.
+set -eu
+read -rsp "Token: " T; echo
+T="$(printf '%s' "$T" | tr -d '[:space:]')"
+case "$T" in
+  aop_live_*) ;;
+  *) echo "That doesn't start with aop_live_. Nothing was changed."; exit 1 ;;
+esac
+systemctl stop amp-orb-provider
+( umask 077; printf 'AMP_ORB_PROVIDER_TOKEN=%s\n' "$T" > /etc/amp-orb-provider.env )
+SINCE="$(date '+%Y-%m-%d %H:%M:%S')"
+systemctl start amp-orb-provider
+sleep 8
+if journalctl -u amp-orb-provider --since "$SINCE" --no-pager | grep -q "rejected"; then
+  systemctl stop amp-orb-provider
+  echo "REJECTED: Amp did not accept this token. The provider is stopped."
+  exit 1
+fi
+if systemctl is-active --quiet amp-orb-provider; then
+  echo "ACCEPTED: the provider is connected."
+else
+  echo "FAILED: the provider stopped for another reason."
+  journalctl -u amp-orb-provider --since "$SINCE" --no-pager | tail -5 | cut -c1-200
+  exit 1
+fi

@@ -1,0 +1,7 @@
+[Unit]
+Description=Remove old stopped Amp orbs and snapshots
+After=incus.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/orb-cleanup
